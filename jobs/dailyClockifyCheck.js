@@ -142,10 +142,12 @@ const { metaToken, metaPhoneNumberId } = require('../config/whatsappConfig');
 
 const users = [
   { name: 'Abhiram', clockifyId: '682ebe69a9a5d61a4c016a94', phone: '918590292642' },
-  { name: 'Lakshmi', clockifyId: '67975db1c0283f7b17cc71d8', phone: '919496649110' },
+  { name: 'Lakshmi', clockifyId: '67975db1c0283f7b17cc71d8', phone: '918590302743' },
+  { name: 'Sanu', clockifyId: '685e2baa30158b1c138222d3', phone: '919496649110' },
+
 ];
 
-const adminPhone = '918590292642';
+const adminPhone = '919562684960';
 const workspaceId = process.env.CLOCKIFY_WORKSPACE_ID;
 const clockifyApiKey = process.env.CLOCKIFY_API_KEY;
 
