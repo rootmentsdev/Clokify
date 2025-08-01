@@ -124,8 +124,12 @@ app.get('/webhook', (req, res) => {
 // ───────────────────────────────────────────────────────────
 // Combined Webhook Handler (POST - Meta messages)
 // ───────────────────────────────────────────────────────────
-const OWNER_NUMBER = process.env.OWNER_NUMBER;
-const ALLOWED_NUMBERS = [OWNER_NUMBER, "15551281515"]; // Allow sandbox too
+// Support multiple owner numbers from env, comma-separated
+const OWNER_NUMBERS = process.env.OWNER_NUMBERS
+  ? process.env.OWNER_NUMBERS.split(',').map(n => n.trim())
+  : [process.env.OWNER_NUMBER];
+
+const ALLOWED_NUMBERS = [...OWNER_NUMBERS, "15551281515"]; // Add sandbox if needed
 
 app.post('/webhook', async (req, res) => {
   try {
