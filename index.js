@@ -168,6 +168,9 @@ const OWNER_NUMBERS = process.env.OWNER_NUMBERS
 
 const ALLOWED_NUMBERS = [...OWNER_NUMBERS, "15551281515"]; // Add sandbox if needed
 
+// Only this number can add events to Google Sheets
+const EVENT_CREATOR_NUMBER = "919746462423";
+
 app.post('/webhook', async (req, res) => {
   try {
     const entry = req.body.entry?.[0];
@@ -189,21 +192,48 @@ app.post('/webhook', async (req, res) => {
     if (!sessions.has(sender)) sessions.set(sender, { step: null, data: {} });
     const session = sessions.get(sender);
 
-    // Handle Google Sheets event creation
+    // Handle Google Sheets event creation - Only allow EVENT_CREATOR_NUMBER
     try {
       if (/^add event$/i.test(text)) {
+        // Check if sender is authorized to create events
+        if (sender !== EVENT_CREATOR_NUMBER) {
+          await sendWhatsAppMessage(sender, "❌ You are not authorized to create events. Only the admin can add events to Google Sheets.");
+          return res.sendStatus(200);
+        }
+        
         session.step = "await_title";
         session.data = {};
         await sendWhatsAppMessage(sender, "Add your Event Title");
       } else if (session.step === "await_title") {
+        // Check if sender is authorized to continue the session
+        if (sender !== EVENT_CREATOR_NUMBER) {
+          await sendWhatsAppMessage(sender, "❌ You are not authorized to create events. Only the admin can add events to Google Sheets.");
+          sessions.delete(sender); // Clear the session
+          return res.sendStatus(200);
+        }
+        
         session.data.title = text;
         session.step = "await_start";
         await sendWhatsAppMessage(sender, "Add the start date (e.g. 2 Jul 25 10:00)");
       } else if (session.step === "await_start") {
+        // Check if sender is authorized to continue the session
+        if (sender !== EVENT_CREATOR_NUMBER) {
+          await sendWhatsAppMessage(sender, "❌ You are not authorized to create events. Only the admin can add events to Google Sheets.");
+          sessions.delete(sender); // Clear the session
+          return res.sendStatus(200);
+        }
+        
         session.data.start = parseDate(text);
         session.step = "await_end";
         await sendWhatsAppMessage(sender, "Add the end date (e.g. 2 Jul 25 11:00)");
       } else if (session.step === "await_end") {
+        // Check if sender is authorized to continue the session
+        if (sender !== EVENT_CREATOR_NUMBER) {
+          await sendWhatsAppMessage(sender, "❌ You are not authorized to create events. Only the admin can add events to Google Sheets.");
+          sessions.delete(sender); // Clear the session
+          return res.sendStatus(200);
+        }
+        
         session.data.end = parseDate(text);
         await addEventToSheet([
           session.data.title,
@@ -213,7 +243,12 @@ app.post('/webhook', async (req, res) => {
         sessions.delete(sender);
         await sendWhatsAppMessage(sender, "✅ Event added to Google Sheets. Have a nice day!");
       } else {
-        await sendWhatsAppMessage(sender, "Send 'Add event' to start adding an event to Google Sheets.");
+        // For any other message, check if sender is authorized
+        if (sender === EVENT_CREATOR_NUMBER) {
+          await sendWhatsAppMessage(sender, "Send 'Add event' to start adding an event to Google Sheets.");
+        } else {
+          await sendWhatsAppMessage(sender, "❌ You are not authorized to create events. Only the admin can add events to Google Sheets.");
+        }
       }
     } catch (error) {
       console.error("❌ Error sending WhatsApp message:", error.message);
