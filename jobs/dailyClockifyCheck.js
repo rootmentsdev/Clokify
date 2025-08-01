@@ -138,7 +138,6 @@
 
 const axios = require('axios');
 const { sendWhatsAppMessage } = require('../services/whatsappService');
-const { metaToken, metaPhoneNumberId } = require('../config/whatsappConfig');
 
 const users = [
   { name: 'Abhiram', clockifyId: '682ebe69a9a5d61a4c016a94', phone: '918590292642' },
@@ -193,15 +192,23 @@ async function checkUsersStarted() {
   if (notStarted.length > 0 || isFirstRun) {
     const details = notStarted.map(u => `${u.name}${u.error ? ' (error: ' + u.error + ')' : ''}`).join('\n');
 
-    if (notStarted.length > 0) {
-      for (const user of notStarted) {
-        await sendWhatsAppMessage(user.phone, `⚠️ You haven't started your Clockify timer today. Please start it now.`);
-      }
+    try {
+      if (notStarted.length > 0) {
+        for (const user of notStarted) {
+          try {
+            await sendWhatsAppMessage(user.phone, `⚠️ You haven't started your Clockify timer today. Please start it now.`);
+          } catch (error) {
+            console.error(`❌ Failed to send WhatsApp message to ${user.name}:`, error.message);
+          }
+        }
 
-      const adminMsg = `⚠️ Clockify Alert:\nThe following users have not logged time today:\n${details}`;
-      await sendWhatsAppMessage(adminPhone, adminMsg);
-    } else {
-      await sendWhatsAppMessage(adminPhone, `✅ All users have logged time today.`);
+        const adminMsg = `⚠️ Clockify Alert:\nThe following users have not logged time today:\n${details}`;
+        await sendWhatsAppMessage(adminPhone, adminMsg);
+      } else {
+        await sendWhatsAppMessage(adminPhone, `✅ All users have logged time today.`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to send WhatsApp messages:', error.message);
     }
   }
 
