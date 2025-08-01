@@ -23,18 +23,43 @@ let auth = null;
 let SHEET_ID = null;
 
 // Only initialize Google Sheets if credentials are provided
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+if (process.env.GOOGLE_CREDENTIALS_JSON) {
+  try {
+    auth = new google.auth.GoogleAuth({
+      credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+    SHEET_ID = process.env.SHEET_ID;
+    console.log("✅ Google Sheets configured successfully");
+  } catch (error) {
+    console.warn("⚠️ Google Sheets credentials not properly configured:", error.message);
+  }
+} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.GOOGLE_APPLICATION_CREDENTIALS.startsWith('{')) {
+  // If GOOGLE_APPLICATION_CREDENTIALS contains JSON, parse it
+  try {
+    auth = new google.auth.GoogleAuth({
+      credentials: JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+    SHEET_ID = process.env.SHEET_ID;
+    console.log("✅ Google Sheets configured successfully (using GOOGLE_APPLICATION_CREDENTIALS as JSON)");
+  } catch (error) {
+    console.warn("⚠️ Google Sheets credentials not properly configured:", error.message);
+  }
+} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.GOOGLE_APPLICATION_CREDENTIALS.startsWith('{')) {
+  // Only use as keyFile if it's not JSON content
   try {
     auth = new google.auth.GoogleAuth({
       keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
     SHEET_ID = process.env.SHEET_ID;
+    console.log("✅ Google Sheets configured successfully (using keyFile)");
   } catch (error) {
     console.warn("⚠️ Google Sheets credentials not properly configured:", error.message);
   }
 } else {
-  console.warn("⚠️ GOOGLE_APPLICATION_CREDENTIALS not found. Google Sheets functionality will be disabled.");
+  console.warn("⚠️ GOOGLE_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS not found. Google Sheets functionality will be disabled.");
 }
 
 async function addEventToSheet([title, start, end]) {
