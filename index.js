@@ -60,6 +60,18 @@ async function sendWhatsAppMessage(to, message) {
   const phoneNumberId = process.env.WHATSAPP_META_PHONE_NUMBER_ID;
   const token = process.env.WHATSAPP_META_TOKEN;
 
+  // Validate required environment variables
+  if (!phoneNumberId) {
+    throw new Error('WHATSAPP_META_PHONE_NUMBER_ID environment variable is not set');
+  }
+  
+  if (!token) {
+    throw new Error('WHATSAPP_META_TOKEN environment variable is not set');
+  }
+
+  // Clean the token to remove any invalid characters
+  const cleanToken = token.trim().replace(/[^\w\-\.]/g, '');
+  
   await axios.post(
     `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
     {
@@ -70,7 +82,7 @@ async function sendWhatsAppMessage(to, message) {
     },
     {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${cleanToken}`,
         "Content-Type": "application/json",
       },
     }
@@ -153,29 +165,34 @@ app.post('/webhook', async (req, res) => {
     const session = sessions.get(sender);
 
     // Handle Google Sheets event creation
-    if (/^add event$/i.test(text)) {
-      session.step = "await_title";
-      session.data = {};
-      await sendWhatsAppMessage(sender, "Add your Event Title");
-    } else if (session.step === "await_title") {
-      session.data.title = text;
-      session.step = "await_start";
-      await sendWhatsAppMessage(sender, "Add the start date (e.g. 2 Jul 25 10:00)");
-    } else if (session.step === "await_start") {
-      session.data.start = parseDate(text);
-      session.step = "await_end";
-      await sendWhatsAppMessage(sender, "Add the end date (e.g. 2 Jul 25 11:00)");
-    } else if (session.step === "await_end") {
-      session.data.end = parseDate(text);
-      await addEventToSheet([
-        session.data.title,
-        session.data.start,
-        session.data.end
-      ]);
-      sessions.delete(sender);
-      await sendWhatsAppMessage(sender, "✅ Event added to Google Sheets. Have a nice day!");
-    } else {
-      await sendWhatsAppMessage(sender, "Send 'Add event' to start adding an event to Google Sheets.");
+    try {
+      if (/^add event$/i.test(text)) {
+        session.step = "await_title";
+        session.data = {};
+        await sendWhatsAppMessage(sender, "Add your Event Title");
+      } else if (session.step === "await_title") {
+        session.data.title = text;
+        session.step = "await_start";
+        await sendWhatsAppMessage(sender, "Add the start date (e.g. 2 Jul 25 10:00)");
+      } else if (session.step === "await_start") {
+        session.data.start = parseDate(text);
+        session.step = "await_end";
+        await sendWhatsAppMessage(sender, "Add the end date (e.g. 2 Jul 25 11:00)");
+      } else if (session.step === "await_end") {
+        session.data.end = parseDate(text);
+        await addEventToSheet([
+          session.data.title,
+          session.data.start,
+          session.data.end
+        ]);
+        sessions.delete(sender);
+        await sendWhatsAppMessage(sender, "✅ Event added to Google Sheets. Have a nice day!");
+      } else {
+        await sendWhatsAppMessage(sender, "Send 'Add event' to start adding an event to Google Sheets.");
+      }
+    } catch (error) {
+      console.error("❌ Error sending WhatsApp message:", error.message);
+      // Don't crash the webhook, just log the error
     }
 
     res.sendStatus(200);
