@@ -358,6 +358,11 @@ app.listen(PORT, () => {
 // ───────────────────────────────────────────────────────────
 // Cron jobs for Clockify
 // ───────────────────────────────────────────────────────────
+// Run every 10 minutes (all day, for testing)
+// cron.schedule('*/10 * * * *', () => {
+//   dailyClockifyCheck();
+// });
+
 // Run every 10 minutes from 10:00 to 16:59
 cron.schedule('*/10 10-16 * * *', () => {
   dailyClockifyCheck();
