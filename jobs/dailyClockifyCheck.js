@@ -234,13 +234,18 @@ const clockifyApiKey = process.env.CLOCKIFY_API_KEY;
 let firstRunCompleted = false;
 
 async function checkUsersStarted() {
+  // Convert to India time (GMT+5:30)
   const now = new Date();
-  const currentHour = now.getHours();      // 0–23
-  const currentMinute = now.getMinutes();  // 0–59
+  const indiaTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5.5 hours for GMT+5:30
+  const currentHour = indiaTime.getUTCHours();      // 0–23
+  const currentMinute = indiaTime.getUTCMinutes();  // 0–59
   const currentTime = currentHour * 60 + currentMinute;
 
   const startMinutes = 9 * 60 + 30;   // 9:30 AM = 570
   const endMinutes = 17 * 60;         // 5:00 PM = 1020
+
+  console.log(`🕐 Current India time: ${currentHour}:${currentMinute.toString().padStart(2, '0')} (${currentTime} minutes)`);
+  console.log(`⏰ Working hours: 9:30-17:00 (${startMinutes}-${endMinutes} minutes)`);
 
   // ⛔ DO NOTHING if not between 9:30 AM and 5:00 PM
   if (currentTime < startMinutes || currentTime >= endMinutes) {
@@ -253,7 +258,7 @@ async function checkUsersStarted() {
     firstRunCompleted = false; // Reset at 10 AM
   }
 
-  console.log(`🔁 Running Clockify check at ${now.toLocaleTimeString()}`);
+  console.log(`🔁 Running Clockify check at ${currentHour}:${currentMinute.toString().padStart(2, '0')} (India time)`);
 
   const notStarted = [];
 
