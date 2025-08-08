@@ -1,4 +1,3 @@
-
 // clockifyChecker.js
 const axios = require('axios');
 const { sendWhatsAppMessage } = require('../services/whatsappService');
@@ -13,19 +12,17 @@ const adminPhone = '919562684960';
 const workspaceId = process.env.CLOCKIFY_WORKSPACE_ID;
 const clockifyApiKey = process.env.CLOCKIFY_API_KEY;
 
-// Track which user got the “>1 hour on same timer” alert today
+// Track per-user, per-day, per-hour alerts (so it pings at 1h, 2h, 3h... only once each)
 const hourAlertSent = Object.create(null);
 
 // —— Time helpers (robust IST handling) ——
 function nowInIST() {
-  // Avoid adding 5.5h to local time (buggy). Use timezone conversion instead.
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 }
 function startOfDayIST(d = nowInIST()) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
 }
 function toIsoUTC(dateIst) {
-  // Convert an IST Date object’s *wall clock* to UTC ISO string that Clockify expects.
   const utc = new Date(dateIst.getTime() - (dateIst.getTimezoneOffset() * 60000));
   return utc.toISOString();
 }
@@ -46,7 +43,6 @@ async function getTodayEntries(userId) {
   const startISO = toIsoUTC(dayStartIST);
   const endISO = toIsoUTC(istNow);
 
-  // Pull today's entries (Clockify supports filters via query params)
   const url = `https://api.clockify.me/api/v1/workspaces/${workspaceId}/user/${userId}/time-entries` +
               `?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}&page-size=500`;
   const res = await axios.get(url, { headers: { 'X-Api-Key': clockifyApiKey } });
@@ -71,7 +67,6 @@ function summarizeByProject(entries) {
     prev.count += 1;
     map.set(pid, prev);
   }
-  // Return sorted array by time desc
   return [...map.entries()]
     .map(([projectId, v]) => ({ projectId, ms: v.ms, count: v.count }))
     .sort((a, b) => b.ms - a.ms);
@@ -87,8 +82,8 @@ async function checkUsersStarted() {
   const currentMin = minutesSinceMidnightIST(istNow);
 
   // Work window 09:00–17:00 IST (exclusive end)
-  const startMinutes = 9 * 60;     // 540
-  const endMinutes   = 17 * 60;    // 1020
+  const startMinutes = 9 * 60;
+  const endMinutes   = 17 * 60;
 
   console.log(`🕐 IST now: ${istNow.toTimeString().slice(0,5)} (${currentMin} minutes)`);
 
@@ -97,16 +92,16 @@ async function checkUsersStarted() {
     return;
   }
 
-  // Reset hour-alert bookeeping daily (keyed by date)
-  const todayKey = istNow.toISOString().slice(0, 10);
-  // Prune old keys
+  // Reset hour-alert bookkeeping to today only
+  const todayKey = istNow.toISOString().slice(0, 10); // YYYY-MM-DD
   Object.keys(hourAlertSent).forEach(k => {
-    if (!k.endsWith(todayKey)) delete hourAlertSent[k];
+    // keep only keys that include today's date segment
+    if (!k.includes(`_${todayKey}_`)) delete hourAlertSent[k];
   });
 
   const notStarted = [];
   const hourAlerts = [];
-  const quickInsights = []; // { userName, lines[] } lines by project
+  const quickInsights = []; // { userName, lines[] }
 
   for (const user of users) {
     try {
@@ -118,17 +113,23 @@ async function checkUsersStarted() {
         notStarted.push(user);
       } else {
         console.log(`✅ ${user.name} has an ACTIVE timer`);
-        // >1 hour alert on the active timer
+
+        // CHANGED: fire alert once per *whole hour* bucket (1h, 2h, 3h…)
         const startTime = new Date(inProg.timeInterval.start);
-        const durHr = (new Date() - startTime) / 3_600_000;
-        const alertKey = `${user.clockifyId}_${todayKey}`;
-        if (durHr > 1 && !hourAlertSent[alertKey]) {
-          hourAlerts.push({
-            ...user,
-            duration: durHr.toFixed(2),
-            project: inProg.projectId || 'Unknown',
-          });
-          hourAlertSent[alertKey] = true;
+        const durationMs = new Date() - startTime;
+        const durHr = durationMs / 3_600_000;
+        const hourBucket = Math.floor(durHr); // 0,1,2,...
+
+        if (hourBucket >= 1) {
+          const alertKey = `${user.clockifyId}_${todayKey}_h${hourBucket}`;
+          if (!hourAlertSent[alertKey]) {
+            hourAlerts.push({
+              ...user,
+              duration: hourBucket.toFixed(0), // show whole hours
+              project: inProg.projectId || 'Unknown',
+            });
+            hourAlertSent[alertKey] = true;
+          }
         }
       }
 
@@ -137,7 +138,7 @@ async function checkUsersStarted() {
       const byProject = summarizeByProject(todaysEntries);
       if (byProject.length > 0) {
         const lines = byProject
-          .slice(0, 3) // keep it short
+          .slice(0, 3)
           .map(p => `• ${p.projectId}: ${hrs(p.ms)} h (${p.count} entries)`);
         quickInsights.push({ userName: user.name, lines });
       } else {
@@ -168,9 +169,9 @@ async function checkUsersStarted() {
     console.error('❌ Failed to send “not started” WhatsApp messages:', e.message);
   }
 
-  // — Funny hour alerts —
+  // — Hourly (>1h) alerts —
   for (const u of hourAlerts) {
-    const msg = `🐢 You Are Working Like a Turtle! Be a Rabbit, Be Fast! (You’ve been on this project for ${u.duration} hours)`;
+    const msg = `🐢 You’re still on the same task — ${u.duration}h elapsed. Pace up!`;
     try {
       await sendWhatsAppMessage(u.phone, msg);
     } catch (e) {
@@ -178,13 +179,12 @@ async function checkUsersStarted() {
     }
   }
   if (hourAlerts.length) {
-    const adminMsg = `🐢 Turtle Alert:\n${hourAlerts.map(u => `${u.name} (${u.duration} hr) - timer > 1 hr`).join('\n')}`;
+    const adminMsg = `🐢 Turtle Alert:\n${hourAlerts.map(u => `${u.name} (${u.duration}h) - timer >= ${u.duration}h`).join('\n')}`;
     try { await sendWhatsAppMessage(adminPhone, adminMsg); } catch {}
   }
 
   // — Short “project time” insights (admin, compact) —
   try {
-    // Send this every 10 minutes with the main check (kept brief)
     const blocks = quickInsights.map(q =>
       `👤 ${q.userName}\n${q.lines.join('\n')}`
     ).join('\n\n');
