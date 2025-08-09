@@ -37,9 +37,9 @@ function minutesSinceMidnightIST(d = nowInIST()) {
 async function loadProjectCache() {
   if (projectCache) return projectCache;
   const url = `https://api.clockify.me/api/v1/workspaces/${workspaceId}/projects?page-size=500`;
-  console.log(`📡 Fetching project list: ${url}`);
+  // console.log(`📡 Fetching project list: ${url}`);
   const res = await axios.get(url, { headers: { 'X-Api-Key': clockifyApiKey } });
-  console.log('📥 Projects API raw response:', JSON.stringify(res.data, null, 2));
+  // console.log('📥 Projects API raw response:', JSON.stringify(res.data, null, 2));
   projectCache = {};
   if (Array.isArray(res.data)) {
     for (const p of res.data) {

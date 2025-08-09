@@ -358,17 +358,27 @@ app.listen(PORT, () => {
 // ───────────────────────────────────────────────────────────
 // Cron jobs for Clockify
 // ───────────────────────────────────────────────────────────
-// Run every 10 minutes (all day, for testing)
-// cron.schedule('*/10 * * * *', () => {
-//   dailyClockifyCheck();
-// });
+// ───────────────────────────────────────────────────────────
+// Cron jobs for Clockify (IST)
+// ───────────────────────────────────────────────────────────
+const TZ = 'Asia/Kolkata';
 
-// Run every 10 minutes from 10:00 to 16:59
-cron.schedule('*/10 10-16 * * *', () => {
-  dailyClockifyCheck();
-});
+// Every 10 minutes from 09:00–16:59 IST
+cron.schedule('*/10 9-16 * * *', async () => {
+  console.log('⏰ Cron tick (*/10 9-16) — running dailyClockifyCheck');
+  try {
+    await dailyClockifyCheck(); // or await checkUsersStarted();
+  } catch (e) {
+    console.error('❌ Cron (*/10 9-16) failed:', e);
+  }
+}, { timezone: TZ });
 
-// One last run at 5:00 PM
-cron.schedule('0 17 * * *', () => {
-  dailyClockifyCheck();
-});
+// One last run exactly at 17:00 IST
+cron.schedule('0 17 * * *', async () => {
+  console.log('⏰ Cron tick (17:00) — running dailyClockifyCheck');
+  try {
+    await dailyClockifyCheck(); // or await checkUsersStarted();
+  } catch (e) {
+    console.error('❌ Cron (17:00) failed:', e);
+  }
+}, { timezone: TZ });
