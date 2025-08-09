@@ -64,6 +64,7 @@ async function getTodayEntries(userId) {
   const dayStartIST = startOfDayIST(istNow);
   const startISO = toIsoUTC(dayStartIST);
   const endISO = toIsoUTC(istNow);
+  
 
   const url =
     `https://api.clockify.me/api/v1/workspaces/${workspaceId}/user/${userId}/time-entries` +
