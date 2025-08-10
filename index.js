@@ -7,6 +7,9 @@ const dayjs = require('dayjs');
 const customParseFormat = require('dayjs/plugin/customParseFormat');
 const cron = require('node-cron');
 
+
+const { runClickUpInProgressReport } = require('./jobs/clickupInProgressReport');
+
 dayjs.extend(customParseFormat);
 
 const app = express();
@@ -382,3 +385,49 @@ cron.schedule('0 17 * * *', async () => {
     console.error('❌ Cron (17:00) failed:', e);
   }
 }, { timezone: TZ });
+
+
+// Manual trigger route for testing
+app.get('/api/clickup/send-inprogress', async (req, res) => {
+  try {
+    const { count } = await runClickUpInProgressReport();
+    res.json({ ok: true, sent: true, tasks: count });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+
+
+
+// ClickUp: every hour at :00 from 09:00 through 17:00 IST, daily
+cron.schedule('0 9-17 * * *', async () => {
+  try {
+    const { count } = await runClickUpInProgressReport();
+    console.log(`[CRON] ClickUp report sent (hourly 9–17 IST). Tasks: ${count}`);
+  } catch (e) {
+    console.error('❌ CRON ClickUp hourly error:', e?.response?.data || e.message);
+  }
+}, { timezone: TZ });
+
+
+
+
+// ───────────────────────────────────────────────────────────
+// ClickUp "IN PROGRESS" report on startup (optional via .env)
+// ───────────────────────────────────────────────────────────
+(async () => {
+  try {
+    if (String(process.env.STARTUP_CLICKUP_REPORT).toLowerCase() === 'true') {
+      // small delay so env + network are fully ready
+      await new Promise(r => setTimeout(r, 3000));
+      console.log('[STARTUP] Sending ClickUp IN PROGRESS report...');
+      const { count } = await runClickUpInProgressReport();
+      console.log(`[STARTUP] ClickUp report sent. Tasks: ${count}`);
+    } else {
+      console.log('[STARTUP] ClickUp startup report disabled (set STARTUP_CLICKUP_REPORT=true to enable).');
+    }
+  } catch (e) {
+    console.error('[STARTUP] ClickUp report failed:', e?.response?.data || e.message);
+  }
+})();
