@@ -8,7 +8,7 @@ const users = [
   { name: 'Sanu', clockifyId: '685e2baa30158b1c138222d3', phone: '919496649110' },
 ];
 
-const adminPhone = '918590292642';
+const adminPhone = '918943300095';
 const workspaceId = process.env.CLOCKIFY_WORKSPACE_ID;
 const clockifyApiKey = process.env.CLOCKIFY_API_KEY;
 
