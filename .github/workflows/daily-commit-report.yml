@@ -1,0 +1,119 @@
+name: Daily Commit Report
+
+on:
+  schedule:
+    # Runs daily at 09:00 IST (03:30 UTC)
+    - cron: "30 3 * * *"
+  # You can also run it manually and choose a branch/time window
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to scan (leave empty to use default branch)"
+        required: false
+        default: ""
+      hours:
+        description: "How many past hours to check"
+        required: false
+        default: "24"
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Generate commit report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            // 1) figure out branch
+            const { data: repoData } = await github.rest.repos.get({ owner, repo });
+            const defaultBranch = repoData.default_branch;
+            const inputBranch = core.getInput('branch')?.trim();
+            const branch = inputBranch || defaultBranch;
+
+            // 2) time window (default 24h)
+            const hours = Number(core.getInput('hours') || '24');
+            const since = new Date(Date.now() - hours*60*60*1000).toISOString();
+
+            // 3) get commits on the branch since time window
+            const commits = await github.paginate(
+              github.rest.repos.listCommits,
+              { owner, repo, sha: branch, since, per_page: 100 }
+            );
+
+            // 4) check message format (Conventional Commits — simple regex)
+            const cc = /^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([^)]+\))?!?: .+/;
+
+            const rows = commits.map(c => {
+              const sha7 = c.sha.slice(0,7);
+              const firstLine = (c.commit.message || '').split('\n')[0];
+              const author = (c.author?.login || c.commit?.author?.name || 'unknown');
+              const ok = cc.test(firstLine);
+              return { sha7, author, message: firstLine, ok };
+            });
+
+            const good = rows.filter(r => r.ok);
+            const bad  = rows.filter(r => !r.ok);
+
+            // 5) build a nice summary shown in the Actions run page
+            core.summary
+              .addHeading('Daily Commit Report')
+              .addTable([
+                [{data:'Repository', header:true}, `${owner}/${repo}`],
+                [{data:'Branch', header:true}, branch],
+                [{data:'Window', header:true}, `Last ${hours} hour(s) since ${since}`],
+                [{data:'# Commits', header:true}, `${commits.length}`],
+                [{data:'Good / Bad', header:true}, `${good.length} / ${bad.length}`]
+              ])
+              .addHeading('Details')
+              .addRaw(rows.length
+                ? `\n| SHA | Author | Proper? | Message |\n| --- | --- | --- | --- |\n` +
+                  rows.map(r => `| ${r.sha7} | ${r.author} | ${r.ok ? '✅' : '❌'} | ${r.message.replace(/\|/g,'\\|')} |`).join('\n')
+                : '\nNo commits found in the selected window.'
+              )
+              .addHeading('Rule used')
+              .addCodeBlock(
+                'type(scope)?: short summary\\n' +
+                'Examples:\\n' +
+                'feat(login): add OTP verification\\n' +
+                'fix(billing): correct UPI rounding',
+                'text'
+              )
+              .write();
+
+            // 6) Optional: create/update an Issue if there are bad commits
+            if (bad.length > 0) {
+              const today = new Date().toISOString().slice(0,10);
+              const title = `Commit message violations – ${today} (${branch})`;
+              const body = [
+                `**Repo:** ${owner}/${repo}`,
+                `**Branch:** ${branch}`,
+                `**Window:** Last ${hours} hour(s) since ${since}`,
+                `**Total commits:** ${commits.length}`,
+                `**Violations:** ${bad.length}`,
+                '',
+                '| SHA | Author | Message |',
+                '| --- | ------ | ------- |',
+                ...bad.map(b => `| ${b.sha7} | ${b.author} | ${b.message.replace(/\|/g,'\\|')} |`),
+                '',
+                'Expected format (Conventional Commits):',
+                '`<type>(optional scope)!: <short summary>` e.g. `feat(login): add OTP flow`'
+              ].join('\n');
+
+              const existing = await github.rest.search.issuesAndPullRequests({
+                q: `repo:${owner}/${repo} is:issue in:title "${title}"`
+              });
+              if (existing.data.total_count > 0) {
+                const issue = existing.data.items[0];
+                await github.rest.issues.createComment({ owner, repo, issue_number: issue.number, body });
+              } else {
+                await github.rest.issues.create({ owner, repo, title, body, labels: ['ci','commit-audit'] });
+              }
+
+              core.setFailed(`Found ${bad.length} non-compliant commit message(s).`);
+            }
