@@ -366,6 +366,8 @@ class AIAnalysisService {
     };
 
     // ---- Standards ----
+
+    
     this.rules = {
       minTitleLen: 6,
       minDescLen: 15,
