@@ -31,6 +31,8 @@ GOOGLE_CREDENTIALS_JSON={"type":"service_account","project_id":"your_project_id"
 ### WhatsApp to Google Sheets specific variables
 ```
 OWNER_NUMBER=918590292642
+# OR use multiple owner numbers (comma-separated)
+# OWNER_NUMBERS=918590292642,919496649110
 ```
 
 ## How to Get These Values
@@ -66,4 +68,6 @@ OWNER_NUMBER=918590292642
 - The WhatsApp functionality uses the same `WHATSAPP_META_TOKEN` and `WHATSAPP_META_PHONE_NUMBER_ID` variables for both Clockify alerts and Google Sheets events
 - Make sure your Google Sheet has columns A, B, C for Title, Start Date, and End Date
 - The `OWNER_NUMBER` should be your WhatsApp number in international format
+- You can use `OWNER_NUMBERS` (comma-separated) to add multiple admin numbers
+- Admin numbers receive Clockify alerts and can access WhatsApp webhook features
 - The `META_VERIFY_TOKEN` should match what you set in your Meta webhook configuration 

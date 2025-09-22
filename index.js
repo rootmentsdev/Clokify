@@ -166,7 +166,7 @@ const OWNER_NUMBERS = process.env.OWNER_NUMBERS
   ? process.env.OWNER_NUMBERS.split(',').map(n => n.trim())
   : [process.env.OWNER_NUMBER];
 
-const ALLOWED_NUMBERS = [...OWNER_NUMBERS, "15551281515"]; // Add sandbox if needed
+const ALLOWED_NUMBERS = [...OWNER_NUMBERS, "15551281515", "919496649110"]; // Add sandbox and second admin number
 
 // Only this number can add events to Google Sheets
 const EVENT_CREATOR_NUMBER = "919746462423";
