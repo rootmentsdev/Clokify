@@ -6,10 +6,10 @@ const users = [
   { name: 'Abhiram', clockifyId: '682ebe69a9a5d61a4c016a94', phone: '918590292642' },
   { name: 'Lakshmi', clockifyId: '67975db1c0283f7b17cc71d8', phone: '918590302743' },
   { name: 'Sanu', clockifyId: '685e2baa30158b1c138222d3', phone: '919496649110' },
-    { name: 'Aswin', clockifyId: '68c12043d442192cc9afcc21', phone: '917907492827' },
+  { name: 'Aswin', clockifyId: '68c12043d442192cc9afcc21', phone: '917907492827' },
 ];
 
-const adminPhone = '918943300095';
+const adminPhones = ['918943300095', '919496649110']; // Array of admin numbers
 const workspaceId = process.env.CLOCKIFY_WORKSPACE_ID;
 const clockifyApiKey = process.env.CLOCKIFY_API_KEY;
 
@@ -220,9 +220,15 @@ async function checkUsersStarted() {
       const details = notStarted
         .map((u) => `${u.name}${u.error ? ` (error: ${u.error})` : ''}`)
         .join('\n');
-      await sendWhatsAppMessage(adminPhone, `⚠️ Clockify Alert:\n${details}`);
+      // Send to all admin numbers
+      for (const adminPhone of adminPhones) {
+        await sendWhatsAppMessage(adminPhone, `⚠️ Clockify Alert:\n${details}`);
+      }
     } else {
-      await sendWhatsAppMessage(adminPhone, `✅ All users have logged time today.`);
+      // Send to all admin numbers
+      for (const adminPhone of adminPhones) {
+        await sendWhatsAppMessage(adminPhone, `✅ All users have logged time today.`);
+      }
     }
   } catch (e) {
     console.error('❌ Failed to send “not started” messages:', e.message);
@@ -250,7 +256,10 @@ async function checkUsersStarted() {
         })
         .join('\n');
     try {
-      await sendWhatsAppMessage(adminPhone, adminMsg);
+      // Send to all admin numbers
+      for (const adminPhone of adminPhones) {
+        await sendWhatsAppMessage(adminPhone, adminMsg);
+      }
     } catch {}
   }
 
@@ -259,7 +268,10 @@ async function checkUsersStarted() {
     const blocks = quickInsights
       .map((q) => `👤 ${q.userName}\n${q.lines.join('\n')}`)
       .join('\n\n');
-    await sendWhatsAppMessage(adminPhone, `📊 Quick Project Time (Today, IST)\n${blocks}`);
+    // Send to all admin numbers
+    for (const adminPhone of adminPhones) {
+      await sendWhatsAppMessage(adminPhone, `📊 Quick Project Time (Today, IST)\n${blocks}`);
+    }
   } catch (e) {
     console.error('❌ Failed to send quick insights:', e.message);
   }
