@@ -180,19 +180,31 @@ async function checkUsersStarted() {
         }
       }
 
-      // Build quick insights using FULL description where possible
+      // Build quick insights - prioritize current active task
       const todaysEntries = await getTodayEntries(user.clockifyId);
       const byProject = summarizeByProjectWithDescription(todaysEntries);
 
       if (byProject.length > 0) {
         const lines = byProject.slice(0, 3).map((p) => {
-          // prefer the longest description; fallback to project name
-          const fullName =
-            p.bestDescription ||
-            projectMap[p.projectId] ||
-            p.projectId ||
-            'Unknown Project';
-          return `• ${fullName}: ${hrs(p.ms)} h (${p.count} entries)`;
+          // If this is the current active task, use its description
+          let fullName;
+          if (inProg && inProg.projectId === p.projectId) {
+            // This is the current active task - use its current description
+            fullName = (inProg.description || '').trim() || 
+                      projectMap[p.projectId] || 
+                      p.projectId || 
+                      'Unknown Project';
+          } else {
+            // This is a completed task - use the best description from today
+            fullName = p.bestDescription ||
+                      projectMap[p.projectId] ||
+                      p.projectId ||
+                      'Unknown Project';
+          }
+          
+          // Add indicator for current active task
+          const activeIndicator = (inProg && inProg.projectId === p.projectId) ? ' 🔄' : '';
+          return `• ${fullName}${activeIndicator}: ${hrs(p.ms)} h (${p.count} entries)`;
         });
         quickInsights.push({ userName: user.name, lines });
       } else {
@@ -234,27 +246,41 @@ async function checkUsersStarted() {
     console.error('❌ Failed to send “not started” messages:', e.message);
   }
 
-  // Hourly alerts
+  // Hourly alerts - get current task info for each user
   for (const u of hourAlerts) {
-    const msg = u.description
-      ? `🐢 Still on the same task — ${u.duration}h elapsed.\nTask: ${u.description}`
-      : `🐢 Still on the same task — ${u.duration}h elapsed. Pace up!`;
     try {
+      // Get the current active task to ensure we show the right description
+      const currentTask = await getInProgressEntry(u.clockifyId);
+      const currentDescription = currentTask ? (currentTask.description || '').trim() : '';
+      
+      const msg = currentDescription
+        ? `🐢 Still on the same task — ${u.duration}h elapsed.\nCurrent Task: ${currentDescription}`
+        : `🐢 Still on the same task — ${u.duration}h elapsed. Pace up!`;
+      
       await sendWhatsAppMessage(u.phone, msg);
     } catch (e) {
       console.error(`❌ Failed to send hour alert to ${u.name}:`, e.message);
     }
   }
   if (hourAlerts.length) {
-    const adminMsg =
-      '🐢 Turtle Alert:\n' +
-      hourAlerts
-        .map((u) => {
+    // Get current task info for admin alert
+    const adminAlertDetails = await Promise.all(
+      hourAlerts.map(async (u) => {
+        try {
+          const currentTask = await getInProgressEntry(u.clockifyId);
+          const currentDescription = currentTask ? (currentTask.description || '').trim() : '';
+          const projName = projectMap[u.project] || u.project;
+          const label = currentDescription ? `${currentDescription} (${projName})` : projName;
+          return `${u.name} (${u.duration}h) - ${label}`;
+        } catch (e) {
           const projName = projectMap[u.project] || u.project;
           const label = u.description ? `${u.description} (${projName})` : projName;
           return `${u.name} (${u.duration}h) - ${label}`;
-        })
-        .join('\n');
+        }
+      })
+    );
+    
+    const adminMsg = '🐢 Turtle Alert:\n' + adminAlertDetails.join('\n');
     try {
       // Send to all admin numbers
       for (const adminPhone of adminPhones) {
