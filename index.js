@@ -166,10 +166,12 @@ const OWNER_NUMBERS = process.env.OWNER_NUMBERS
   ? process.env.OWNER_NUMBERS.split(',').map(n => n.trim())
   : [process.env.OWNER_NUMBER];
 
-const ALLOWED_NUMBERS = [...OWNER_NUMBERS, "15551281515", "919496649110"]; // Add sandbox and second admin number
+// Load admin configuration from JSON
+const configLoader = require('./config/configLoader');
+const ADMIN_PHONES = configLoader.getAdminPhones();
+const EVENT_CREATOR_NUMBER = configLoader.getEventCreatorNumber();
 
-// Only this number can add events to Google Sheets
-const EVENT_CREATOR_NUMBER = "919746462423";
+const ALLOWED_NUMBERS = [...OWNER_NUMBERS, "15551281515", ...ADMIN_PHONES]; // Add sandbox and admin numbers
 
 app.post('/webhook', async (req, res) => {
   try {

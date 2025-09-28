@@ -1,15 +1,11 @@
 // clockifyChecker.js
 const axios = require('axios');
 const { sendWhatsAppMessage } = require('../services/whatsappService');
+const configLoader = require('../config/configLoader');
 
-const users = [
-  { name: 'Abhiram', clockifyId: '682ebe69a9a5d61a4c016a94', phone: '918590292642' },
-  { name: 'Lakshmi', clockifyId: '67975db1c0283f7b17cc71d8', phone: '918590302743' },
-  { name: 'Sanu', clockifyId: '685e2baa30158b1c138222d3', phone: '919496649110' },
-  { name: 'Aswin', clockifyId: '68c12043d442192cc9afcc21', phone: '917907492827' },
-];
-
-const adminPhones = ['918943300095', '919496649110']; // Array of admin numbers
+// Get users and admin phones from JSON configuration
+const getUsers = () => configLoader.getUsers();
+const getAdminPhones = () => configLoader.getAdminPhones();
 const workspaceId = process.env.CLOCKIFY_WORKSPACE_ID;
 const clockifyApiKey = process.env.CLOCKIFY_API_KEY;
 
@@ -149,6 +145,7 @@ async function checkUsersStarted() {
   const hourAlerts = [];
   const quickInsights = [];
 
+  const users = getUsers();
   for (const user of users) {
     try {
       console.log(`🚀 Checking user: ${user.name}`);
@@ -233,11 +230,13 @@ async function checkUsersStarted() {
         .map((u) => `${u.name}${u.error ? ` (error: ${u.error})` : ''}`)
         .join('\n');
       // Send to all admin numbers
+      const adminPhones = getAdminPhones();
       for (const adminPhone of adminPhones) {
         await sendWhatsAppMessage(adminPhone, `⚠️ Clockify Alert:\n${details}`);
       }
     } else {
       // Send to all admin numbers
+      const adminPhones = getAdminPhones();
       for (const adminPhone of adminPhones) {
         await sendWhatsAppMessage(adminPhone, `✅ All users have logged time today.`);
       }
@@ -283,6 +282,7 @@ async function checkUsersStarted() {
     const adminMsg = '🐢 Turtle Alert:\n' + adminAlertDetails.join('\n');
     try {
       // Send to all admin numbers
+      const adminPhones = getAdminPhones();
       for (const adminPhone of adminPhones) {
         await sendWhatsAppMessage(adminPhone, adminMsg);
       }
@@ -295,6 +295,7 @@ async function checkUsersStarted() {
       .map((q) => `👤 ${q.userName}\n${q.lines.join('\n')}`)
       .join('\n\n');
     // Send to all admin numbers
+    const adminPhones = getAdminPhones();
     for (const adminPhone of adminPhones) {
       await sendWhatsAppMessage(adminPhone, `📊 Quick Project Time (Today, IST)\n${blocks}`);
     }
