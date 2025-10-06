@@ -122,14 +122,14 @@ async function checkUsersStarted() {
   const istNow = nowInIST();
   const currentMin = minutesSinceMidnightIST(istNow);
 
-  // Work window 09:00–17:00 IST
+  // Work window 09:00–18:00 IST
   const startMinutes = 9 * 60;
-  const endMinutes = 17 * 60;
+  const endMinutes = 18 * 60;
 
   console.log(`🕐 IST now: ${istNow.toTimeString().slice(0, 5)} (${currentMin} minutes)`);
 
   if (currentMin < startMinutes || currentMin >= endMinutes) {
-    console.log('⏹️ Outside working hours (09:00–17:00 IST). Skipping.');
+    console.log('⏹️ Outside working hours (09:00–18:00 IST). Skipping.');
     return;
   }
 

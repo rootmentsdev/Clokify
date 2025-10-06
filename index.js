@@ -365,22 +365,22 @@ app.listen(PORT, () => {
 // ───────────────────────────────────────────────────────────
 const TZ = 'Asia/Kolkata';
 
-// Every 10 minutes from 09:00–16:59 IST
-cron.schedule('*/10 9-16 * * *', async () => {
-  console.log('⏰ Cron tick (*/10 9-16) — running dailyClockifyCheck');
+// Every 10 minutes from 09:00–17:59 IST
+cron.schedule('*/10 9-17 * * *', async () => {
+  console.log('⏰ Cron tick (*/10 9-17) — running dailyClockifyCheck');
   try {
     await dailyClockifyCheck(); // or await checkUsersStarted();
   } catch (e) {
-    console.error('❌ Cron (*/10 9-16) failed:', e);
+    console.error('❌ Cron (*/10 9-17) failed:', e);
   }
 }, { timezone: TZ });
 
-// One last run exactly at 17:00 IST
-cron.schedule('0 17 * * *', async () => {
-  console.log('⏰ Cron tick (17:00) — running dailyClockifyCheck');
+// One last run exactly at 18:00 IST
+cron.schedule('0 18 * * *', async () => {
+  console.log('⏰ Cron tick (18:00) — running dailyClockifyCheck');
   try {
     await dailyClockifyCheck(); // or await checkUsersStarted();
   } catch (e) {
-    console.error('❌ Cron (17:00) failed:', e);
+    console.error('❌ Cron (18:00) failed:', e);
   }
 }, { timezone: TZ });
