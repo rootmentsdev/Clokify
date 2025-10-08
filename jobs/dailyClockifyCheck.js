@@ -13,6 +13,47 @@ let projectCache = null;
 // Per-user, per-day, per-hour alert keys
 const hourAlertSent = Object.create(null);
 
+// —— Leave/Availability tracking ——
+// Store users on leave: { phone: { date: 'YYYY-MM-DD', status: 'leave' } }
+const leaveStatus = new Map();
+
+/**
+ * Mark a user as on leave for today
+ */
+function markUserOnLeave(phone) {
+  const today = nowInIST().toISOString().slice(0, 10);
+  leaveStatus.set(phone, { date: today, status: 'leave' });
+  console.log(`📅 User ${phone} marked as on leave for ${today}`);
+}
+
+/**
+ * Mark a user as available (remove from leave)
+ */
+function markUserAvailable(phone) {
+  leaveStatus.delete(phone);
+  console.log(`✅ User ${phone} marked as available`);
+}
+
+/**
+ * Check if a user is on leave today
+ */
+function isUserOnLeave(phone) {
+  const today = nowInIST().toISOString().slice(0, 10);
+  const userStatus = leaveStatus.get(phone);
+  
+  // If user has leave status and it's for today
+  if (userStatus && userStatus.date === today && userStatus.status === 'leave') {
+    return true;
+  }
+  
+  // Clean up old leave statuses (not today)
+  if (userStatus && userStatus.date !== today) {
+    leaveStatus.delete(phone);
+  }
+  
+  return false;
+}
+
 // —— Time helpers (robust IST handling) ——
 function nowInIST() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
@@ -138,6 +179,13 @@ async function checkUsersStarted() {
   const users = getUsers();
   for (const user of users) {
     try {
+      // Skip users who are on leave
+      if (isUserOnLeave(user.phone)) {
+        console.log(`🏖️ ${user.name} is on leave today - skipping checks`);
+        quickInsights.push({ userName: user.name, lines: ['• On Leave 🏖️'] });
+        continue;
+      }
+
       console.log(`🚀 Checking user: ${user.name}`);
       const inProg = await getInProgressEntry(user.clockifyId);
 
@@ -283,3 +331,6 @@ async function checkUsersStarted() {
 }
 
 module.exports = checkUsersStarted;
+module.exports.markUserOnLeave = markUserOnLeave;
+module.exports.markUserAvailable = markUserAvailable;
+module.exports.isUserOnLeave = isUserOnLeave;

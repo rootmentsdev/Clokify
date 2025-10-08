@@ -1,5 +1,6 @@
 require('dotenv').config();
 const dailyClockifyCheck = require('./jobs/dailyClockifyCheck');
+const { markUserOnLeave, markUserAvailable, isUserOnLeave } = require('./jobs/dailyClockifyCheck');
 const express = require('express');
 const { google } = require('googleapis');
 const axios = require('axios');
@@ -193,6 +194,39 @@ app.post('/webhook', async (req, res) => {
 
     if (!sessions.has(sender)) sessions.set(sender, { step: null, data: {} });
     const session = sessions.get(sender);
+
+    // Handle leave/availability messages
+    try {
+      // Check for leave messages
+      if (/^(leave|on leave|off|holiday|absent)$/i.test(text)) {
+        markUserOnLeave(sender);
+        await sendWhatsAppMessage(sender, "✅ You've been marked as on leave for today. You won't receive Clockify alerts. Send 'available' or 'work' when you're back.");
+        return res.sendStatus(200);
+      }
+      
+      // Check for available/back to work messages
+      if (/^(available|work|back|present|working)$/i.test(text)) {
+        const wasOnLeave = isUserOnLeave(sender);
+        markUserAvailable(sender);
+        const message = wasOnLeave 
+          ? "✅ Welcome back! You've been marked as available. Clockify alerts will resume."
+          : "✅ You're already marked as available. Keep up the good work!";
+        await sendWhatsAppMessage(sender, message);
+        return res.sendStatus(200);
+      }
+
+      // Check leave status
+      if (/^(status|check status|my status)$/i.test(text)) {
+        const onLeave = isUserOnLeave(sender);
+        const message = onLeave
+          ? "📅 You are currently on leave. Send 'available' or 'work' to resume."
+          : "✅ You are currently available and will receive Clockify alerts.";
+        await sendWhatsAppMessage(sender, message);
+        return res.sendStatus(200);
+      }
+    } catch (error) {
+      console.error("❌ Error handling leave/availability:", error.message);
+    }
 
     // Handle Google Sheets event creation - Only allow EVENT_CREATOR_NUMBER
     try {
