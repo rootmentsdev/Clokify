@@ -84,37 +84,27 @@ function hrs(ms) {
 }
 
 /**
- * Group TODAY's entries by projectId and sum durations, while also
- * capturing the longest (most complete) description seen for that project today.
- * This lets us show the full description as the display name.
+ * Get all individual entries with their descriptions and durations.
+ * Returns each entry separately so users can see exactly what they worked on.
  */
-function summarizeByProjectWithDescription(entries) {
-  // Map: projectId -> { ms, count, bestDescription }
-  const map = new Map();
-  for (const e of entries) {
-    const pid = e.projectId || 'Unknown';
-    const prev = map.get(pid) || { ms: 0, count: 0, bestDescription: '' };
-
-    prev.ms += entryDurationMs(e, new Date());
-    prev.count += 1;
-
-    // Prefer the longest non-empty description as the "full name"
-    const d = (e.description || '').trim();
-    if (d && d.length > (prev.bestDescription?.length || 0)) {
-      prev.bestDescription = d;
-    }
-
-    map.set(pid, prev);
-  }
-
-  return [...map.entries()]
-    .map(([projectId, v]) => ({
-      projectId,
-      ms: v.ms,
-      count: v.count,
-      bestDescription: v.bestDescription || '',
-    }))
-    .sort((a, b) => b.ms - a.ms);
+function getIndividualEntries(entries, projectMap) {
+  return entries
+    .map((e) => {
+      const description = (e.description || '').trim();
+      const projectName = projectMap[e.projectId] || e.projectId || 'Unknown Project';
+      const duration = entryDurationMs(e, new Date());
+      
+      // Use description if available, otherwise use project name
+      const displayName = description || projectName;
+      
+      return {
+        projectId: e.projectId,
+        displayName,
+        ms: duration,
+        timeInterval: e.timeInterval,
+      };
+    })
+    .sort((a, b) => b.ms - a.ms); // Sort by duration (longest first)
 }
 
 // —— Main check ——
@@ -177,31 +167,19 @@ async function checkUsersStarted() {
         }
       }
 
-      // Build quick insights - prioritize current active task
+      // Build quick insights - show all individual entries
       const todaysEntries = await getTodayEntries(user.clockifyId);
-      const byProject = summarizeByProjectWithDescription(todaysEntries);
+      const individualEntries = getIndividualEntries(todaysEntries, projectMap);
 
-      if (byProject.length > 0) {
-        const lines = byProject.slice(0, 3).map((p) => {
-          // If this is the current active task, use its description
-          let fullName;
-          if (inProg && inProg.projectId === p.projectId) {
-            // This is the current active task - use its current description
-            fullName = (inProg.description || '').trim() || 
-                      projectMap[p.projectId] || 
-                      p.projectId || 
-                      'Unknown Project';
-          } else {
-            // This is a completed task - use the best description from today
-            fullName = p.bestDescription ||
-                      projectMap[p.projectId] ||
-                      p.projectId ||
-                      'Unknown Project';
-          }
+      if (individualEntries.length > 0) {
+        const lines = individualEntries.map((entry) => {
+          // Check if this is the current active task
+          const isActive = inProg && 
+                          inProg.projectId === entry.projectId && 
+                          inProg.timeInterval.start === entry.timeInterval.start;
           
-          // Add indicator for current active task
-          const activeIndicator = (inProg && inProg.projectId === p.projectId) ? ' 🔄' : '';
-          return `• ${fullName}${activeIndicator}: ${hrs(p.ms)} h (${p.count} entries)`;
+          const activeIndicator = isActive ? ' 🔄' : '';
+          return `• ${entry.displayName}${activeIndicator}: ${hrs(entry.ms)} h`;
         });
         quickInsights.push({ userName: user.name, lines });
       } else {
